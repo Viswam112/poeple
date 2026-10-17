@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+
+# Local camera configuration may contain private stream addresses or credentials.
+/config/cameras.json
+
+# Runtime database and local environment files.
+/people_counter.db
+/people_counter.db-*
+.env
+.venv/
+venv/

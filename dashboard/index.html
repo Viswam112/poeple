@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Workspace People Counting System</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --card-bg: rgba(30, 41, 59, 0.7);
+      --card-bg-solid: #1e293b;
+      --border-color: rgba(255, 255, 255, 0.1);
+      --accent-blue: #3b82f6;
+      --accent-green: #10b981;
+      --accent-red: #ef4444;
+      --accent-amber: #f59e0b;
+      --accent-purple: #a855f7;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+    body { background: var(--bg-dark); color: var(--text-main); min-height: 100vh; padding: 20px; }
+
+    header {
+      display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;
+      padding-bottom: 20px; border-bottom: 1px solid var(--border-color); margin-bottom: 25px;
+    }
+    header h1 { font-size: 1.5rem; font-weight: 700; color: #fff; }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 14px; border-radius: 20px; background: rgba(16, 185, 129, 0.15);
+      color: var(--accent-green); font-size: 0.85rem; font-weight: 600;
+    }
+    .status-badge.degraded { background: rgba(245, 158, 11, 0.15); color: var(--accent-amber); }
+    .status-badge.degraded .pulse-dot { background: var(--accent-amber); }
+    .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-green); animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+
+    .btn {
+      border: 1px solid var(--border-color); background: var(--card-bg-solid); color: var(--text-main);
+      padding: 7px 14px; border-radius: 8px; font-size: 0.85rem; font-weight: 500; cursor: pointer;
+    }
+    .btn:hover { border-color: var(--accent-blue); }
+    .btn.primary { background: var(--accent-blue); border-color: var(--accent-blue); }
+    .btn.danger { color: var(--accent-red); }
+    .btn.small { padding: 4px 10px; font-size: 0.78rem; }
+
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 25px; }
+    .lighting-panel { border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); padding: 14px 0; margin: 0 0 22px; }
+    .lighting-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    .lighting-head h2 { font-size: 1rem; }
+    .lighting-state { color: var(--text-muted); font-size: 0.8rem; }
+    .lighting-controls { display: flex; align-items: end; gap: 14px; flex-wrap: wrap; }
+    .lighting-control { display: grid; gap: 4px; color: var(--text-muted); font-size: 0.72rem; text-transform: uppercase; }
+    .lighting-control select { min-width: 132px; background: var(--card-bg-solid); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 6px; padding: 7px 9px; font-size: 0.85rem; text-transform: none; }
+    .lighting-toggle { display: inline-flex; align-items: center; gap: 8px; min-height: 34px; color: var(--text-main); font-size: 0.85rem; }
+    .lighting-toggle input { width: 18px; height: 18px; accent-color: var(--accent-green); }
+    .lighting-detail { min-width: 120px; display: grid; gap: 4px; font-size: 0.8rem; }
+    .lighting-detail .label { color: var(--text-muted); font-size: 0.68rem; text-transform: uppercase; }
+    .lighting-message { flex: 1 1 100%; min-height: 1em; color: var(--text-muted); font-size: 0.78rem; }
+    .kpi-card {
+      background: var(--card-bg); border: 1px solid var(--border-color);
+      border-radius: 12px; padding: 20px; backdrop-filter: blur(10px);
+    }
+    .kpi-title { font-size: 0.85rem; color: var(--text-muted); font-weight: 500; text-transform: uppercase; margin-bottom: 8px; }
+    .kpi-value { font-size: 2.2rem; font-weight: 700; color: #fff; }
+    .kpi-sub { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
+
+    .section-header { display: flex; justify-content: space-between; align-items: center; margin: 10px 0 14px; }
+    .section-title { font-size: 1.1rem; font-weight: 600; }
+    .grid-controls { display: flex; gap: 8px; align-items: center; font-size: 0.85rem; color: var(--text-muted); }
+    .grid-controls select {
+      background: var(--card-bg-solid); color: var(--text-main); border: 1px solid var(--border-color);
+      border-radius: 6px; padding: 4px 8px; font-size: 0.85rem;
+    }
+
+    .camera-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(var(--tile-min, 420px), 1fr)); }
+    .camera-card {
+      background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px;
+      overflow: hidden; display: flex; flex-direction: column;
+    }
+    .camera-card.offline { border-color: rgba(239, 68, 68, 0.4); }
+    .camera-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; }
+    .camera-name { font-weight: 600; font-size: 0.95rem; }
+    .camera-id { color: var(--text-muted); font-size: 0.75rem; margin-left: 6px; }
+    .camera-status { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; }
+    .camera-status.on { color: var(--accent-green); }
+    .camera-status.off { color: var(--accent-red); }
+    .camera-video { position: relative; background: #000; aspect-ratio: 16 / 9; cursor: pointer; }
+    .camera-video img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    .camera-video .offline-msg {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      color: var(--text-muted); font-size: 0.85rem; background: rgba(0,0,0,0.6);
+    }
+    .camera-occ {
+      position: absolute; top: 8px; left: 8px; background: rgba(15, 23, 42, 0.85);
+      padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 1.1rem; color: var(--accent-blue);
+    }
+    .camera-occ span { font-size: 0.7rem; color: var(--text-muted); font-weight: 500; margin-left: 4px; }
+    .camera-stats { display: grid; grid-template-columns: repeat(4, 1fr); padding: 8px 14px 10px; gap: 6px; }
+    .camera-stat .l { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; }
+    .camera-stat .v { font-size: 0.9rem; font-weight: 600; }
+    .empty-state {
+      grid-column: 1 / -1; text-align: center; padding: 60px 20px; color: var(--text-muted);
+      border: 1px dashed var(--border-color); border-radius: 12px;
+    }
+
+    /* Modal (camera manager + enlarged feed) */
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none;
+      align-items: center; justify-content: center; z-index: 100; padding: 20px;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: var(--card-bg-solid); border: 1px solid var(--border-color); border-radius: 12px;
+      width: min(960px, 100%); max-height: 92vh; overflow: auto; padding: 20px;
+    }
+    .modal.wide { width: min(1400px, 100%); padding: 12px; }
+    .modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .modal-head h2 { font-size: 1.1rem; }
+    .cam-table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+    .cam-table th, .cam-table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border-color); font-size: 0.85rem; }
+    .cam-table th { color: var(--text-muted); font-weight: 500; }
+    .cam-table td.url { font-family: monospace; font-size: 0.78rem; color: var(--text-muted); max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+    .form-grid label { display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; }
+    .form-grid input[type=text], .form-grid input[type=number] {
+      width: 100%; background: var(--bg-dark); color: var(--text-main); border: 1px solid var(--border-color);
+      border-radius: 6px; padding: 8px 10px; font-size: 0.9rem;
+    }
+    .form-grid .full { grid-column: 1 / -1; }
+    .form-actions { display: flex; gap: 8px; margin-top: 14px; align-items: center; }
+    .form-msg { font-size: 0.8rem; color: var(--text-muted); }
+    .form-msg.err { color: var(--accent-red); }
+    .hint { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; }
+
+    /* Exclusion-zone editor */
+    .cam-actions { display: flex; gap: 6px; align-items: center; }
+    .zone-badge {
+      font-size: 0.68rem; font-weight: 600; color: var(--accent-amber);
+      background: rgba(245, 158, 11, 0.15); padding: 2px 7px; border-radius: 10px;
+    }
+    .zone-stage { position: relative; display: inline-block; line-height: 0; background: #000; max-width: 100%; }
+    .zone-stage img { max-width: 100%; display: block; }
+    .zone-stage svg { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+    .zone-stage svg.drawing { cursor: crosshair; }
+    .zone-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0 4px; }
+    .zone-help {
+      font-size: 0.8rem; color: var(--text-muted); line-height: 1.6;
+      background: rgba(59, 130, 246, 0.08); border-left: 2px solid var(--accent-blue);
+      padding: 8px 12px; border-radius: 4px; margin-bottom: 12px;
+    }
+    .zone-help b { color: var(--text-main); }
+    .zone-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; align-items: center; }
+    .zone-chip {
+      display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; cursor: pointer;
+      background: var(--bg-dark); border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 8px;
+    }
+    .zone-chip.selected { border-color: var(--accent-amber); color: var(--accent-amber); }
+    .zone-chip button { background: none; border: none; color: var(--accent-red); cursor: pointer; font-size: 0.9rem; padding: 0; }
+    .zone-unsaved { color: var(--accent-amber); font-size: 0.78rem; font-weight: 600; }
+    .stale-banner {
+      display: none; background: rgba(239, 68, 68, 0.15); color: var(--accent-red);
+      border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 8px;
+      padding: 8px 14px; margin-bottom: 16px; font-size: 0.85rem; font-weight: 600;
+    }
+    .stale-banner.show { display: block; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div>
+      <h1>WORKSPACE PEOPLE COUNTING DASHBOARD</h1>
+      <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">Real-time computer vision workspace occupancy monitoring</p>
+    </div>
+    <div class="header-right">
+      <button class="btn" onclick="openManager()">Manage Cameras</button>
+      <div class="status-badge" id="systemStatus"><span class="pulse-dot"></span> <span id="systemStatusText">System Operational</span></div>
+    </div>
+  </header>
+
+  <div class="stale-banner" id="staleBanner"></div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-title">Current Occupancy</div>
+      <div class="kpi-value" id="kpiCurrent" style="color: var(--accent-blue);">0</div>
+      <div class="kpi-sub">all cameras combined</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-title">Average Occupancy</div>
+      <div class="kpi-value" id="kpiAverage" style="color: var(--accent-green);">0</div>
+      <div class="kpi-sub" id="kpiAverageSub">&nbsp;</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-title">Busiest Time</div>
+      <div class="kpi-value" id="kpiBusiest" style="color: var(--accent-amber);">--:--</div>
+      <div class="kpi-sub" id="kpiBusiestSub">&nbsp;</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-title">Peak Occupancy</div>
+      <div class="kpi-value" id="kpiPeak" style="color: var(--accent-purple);">0</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-title">Cameras Online</div>
+      <div class="kpi-value" id="kpiCams">0 / 0</div>
+      <div class="kpi-sub" id="kpiCamsSub">&nbsp;</div>
+    </div>
+  </div>
+
+  <section class="lighting-panel" aria-label="Smart lighting controls">
+    <div class="lighting-head">
+      <h2>Smart Lighting</h2>
+      <div class="lighting-state">Light state: <b id="lightingState">UNKNOWN</b></div>
+    </div>
+    <div class="lighting-controls">
+      <label class="lighting-toggle"><input id="lightingEnabled" type="checkbox" onchange="saveLightingSettings()"> Automatic lighting</label>
+      <label class="lighting-control">Mode
+        <select id="lightingMode" onchange="saveLightingSettings()">
+          <option value="AUTO">Auto</option>
+          <option value="FORCE_ON">Force on</option>
+          <option value="FORCE_OFF">Force off</option>
+        </select>
+      </label>
+      <label class="lighting-control">Turn off after
+        <select id="lightingDelay" onchange="saveLightingSettings()">
+          <option value="60">1 minute</option>
+          <option value="120">2 minutes</option>
+          <option value="300">5 minutes</option>
+          <option value="600">10 minutes</option>
+          <option value="900">15 minutes</option>
+          <option value="1800">30 minutes</option>
+        </select>
+      </label>
+      <div class="lighting-detail"><span class="label">Dongle bridge</span><b id="lightingDongle">NOT_CONFIGURED</b></div>
+      <div class="lighting-detail"><span class="label">OFF timer</span><b id="lightingTimer">Inactive</b></div>
+      <div class="lighting-message" id="lightingMessage" role="status"></div>
+    </div>
+  </section>
+
+  <div class="section-header">
+    <div class="section-title">Live Camera Feeds</div>
+    <div class="grid-controls">
+      Tile size
+      <select id="tileSize" onchange="setTileSize(this.value)">
+        <option value="300">Small</option>
+        <option value="420" selected>Medium</option>
+        <option value="600">Large</option>
+      </select>
+    </div>
+  </div>
+  <div class="camera-grid" id="cameraGrid">
+    <div class="empty-state">No cameras configured yet. Click <b>Manage Cameras</b> to add one.</div>
+  </div>
+
+  <!-- Enlarged feed -->
+  <div class="modal-backdrop" id="feedModal" onclick="if(event.target===this) closeFeed()">
+    <div class="modal wide">
+      <div class="modal-head"><h2 id="feedTitle"></h2><button class="btn small" onclick="closeFeed()">Close</button></div>
+      <div style="background:#000; border-radius:8px; overflow:hidden;"><img id="feedImg" style="width:100%; display:block;" /></div>
+    </div>
+  </div>
+
+  <!-- Exclusion-zone editor -->
+  <div class="modal-backdrop" id="zoneModal" onclick="if(event.target===this) closeZoneEditor()">
+    <div class="modal wide">
+      <div class="modal-head">
+        <h2 id="zoneTitle">Excluded areas</h2>
+        <button class="btn small" onclick="closeZoneEditor()">Close</button>
+      </div>
+      <div class="zone-help">
+        People detected inside an excluded area are not counted at all. Each camera has its own areas.<br>
+        <b>New area:</b> press <b>Draw new area</b>, click the corners on the picture, then <b>Finish area</b>.<br>
+        <b>Edit an area:</b> click it to select, then drag a corner to reshape it, drag a small hollow
+        dot on an edge to add a corner, or drag the middle of the area to move the whole thing.
+        Right-click a corner to remove it. Press <b>Save</b> when you are happy.
+      </div>
+      <div class="zone-stage" id="zoneStage">
+        <img id="zoneImg" alt="camera snapshot">
+        <svg id="zoneSvg" preserveAspectRatio="none"></svg>
+      </div>
+      <div class="zone-toolbar">
+        <button class="btn primary" id="zoneDrawBtn" onclick="startNewZone()">Draw new area</button>
+        <button class="btn" id="zoneFinishBtn" onclick="finishZone()" style="display:none">Finish area</button>
+        <button class="btn" id="zoneUndoBtn" onclick="undoZonePoint()">Undo</button>
+        <button class="btn danger" id="zoneDelBtn" onclick="deleteSelectedZone()" style="display:none">Delete selected area</button>
+        <button class="btn" onclick="refreshZoneSnapshot()">New snapshot</button>
+        <button class="btn danger" onclick="clearZones()">Clear all</button>
+        <span style="flex:1"></span>
+        <span class="zone-unsaved" id="zoneDirty" style="display:none">unsaved changes</span>
+        <button class="btn primary" onclick="saveZones()">Save</button>
+        <span class="form-msg" id="zoneMsg"></span>
+      </div>
+      <div class="zone-list" id="zoneList"></div>
+    </div>
+  </div>
+
+  <!-- Camera manager -->
+  <div class="modal-backdrop" id="managerModal" onclick="if(event.target===this) closeManager()">
+    <div class="modal">
+      <div class="modal-head"><h2>Cameras</h2><button class="btn small" onclick="closeManager()">Close</button></div>
+      <table class="cam-table">
+        <thead><tr><th>ID</th><th>Name</th><th>Stream URL</th><th>Conf.</th><th>Enabled</th><th></th></tr></thead>
+        <tbody id="camTableBody"></tbody>
+      </table>
+
+      <h3 id="formTitle" style="font-size:0.95rem; margin-bottom:10px;">Add camera</h3>
+      <div class="form-grid">
+        <div><label>Camera ID</label><input type="text" id="fId" placeholder="CAM-002"><div class="hint">Unique, no spaces. Can't be changed later.</div></div>
+        <div><label>Name</label><input type="text" id="fName" placeholder="Main Hall 2"></div>
+        <div class="full"><label>Stream URL</label><input type="text" id="fUrl" placeholder="rtsp://user:pass@192.168.1.20:554/stream1">
+          <div class="hint">RTSP / HTTP URL, a video file path, or a webcam index (0). Encode special characters in the password, e.g. @ &rarr; %40.</div></div>
+        <div><label>Confidence threshold</label><input type="number" id="fConf" step="0.05" min="0.05" max="0.95" value="0.35"><div class="hint">How sure the detector must be before a new person starts being counted. Default 0.35.</div></div>
+        <div><label>Enabled</label><input type="checkbox" id="fEnabled" checked style="width:18px;height:18px;margin-top:8px;"></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn primary" id="saveBtn" onclick="saveCamera()">Add camera</button>
+        <button class="btn" onclick="resetForm()">Clear</button>
+        <span class="form-msg" id="formMsg"></span>
+      </div>
+      <p class="hint" style="margin-top:12px;">Changes are picked up by the detector within a few seconds - no restart needed.</p>
+    </div>
+  </div>
+
+  <script>
+    // ------------------------------------------------------------------ state
+    const cards = {};          // camera_id -> DOM refs
+    const frameSizes = {};     // camera_id -> native stream size, for mapping clicks to camera pixels
+    let editingId = null;
+    let cameraConfigs = [];    // from /api/cameras
+
+    // ------------------------------------------------------------------ helpers
+    const $ = (id) => document.getElementById(id);
+    const clock = (ts) => new Date(ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+    function setTileSize(px) {
+      $('cameraGrid').style.setProperty('--tile-min', px + 'px');
+      try { localStorage.setItem('tileSize', px); } catch (e) {}
+    }
+    try { const t = localStorage.getItem('tileSize'); if (t) { $('tileSize').value = t; setTileSize(t); } } catch (e) {}
+
+    // ------------------------------------------------------------------ camera cards
+    function ensureCard(cam) {
+      if (cards[cam.camera_id]) return cards[cam.camera_id];
+      const grid = $('cameraGrid');
+      const empty = grid.querySelector('.empty-state');
+      if (empty) empty.remove();
+
+      const el = document.createElement('div');
+      el.className = 'camera-card';
+      el.innerHTML = `
+        <div class="camera-head">
+          <div><span class="camera-name"></span><span class="camera-id">${esc(cam.camera_id)}</span></div>
+          <div class="cam-actions">
+            <span class="zone-badge" style="display:none"></span>
+            <button class="btn small" onclick="event.stopPropagation(); openZoneEditor('${esc(cam.camera_id)}')">Exclude areas</button>
+            <span class="camera-status"></span>
+          </div>
+        </div>
+        <div class="camera-video" onclick="openFeed('${esc(cam.camera_id)}')">
+          <img src="/api/video/${encodeURIComponent(cam.camera_id)}/stream" alt="">
+          <div class="camera-occ"><b class="occ"></b><span>in view</span></div>
+          <div class="offline-msg" style="display:none">Camera offline - reconnecting…</div>
+        </div>
+        <div class="camera-stats">
+          <div class="camera-stat"><div class="l">Entries</div><div class="v ent">0</div></div>
+          <div class="camera-stat"><div class="l">Peak</div><div class="v peak">0</div></div>
+          <div class="camera-stat"><div class="l">FPS</div><div class="v fps">0</div></div>
+          <div class="camera-stat"><div class="l">Latency</div><div class="v lat">0 ms</div></div>
+        </div>`;
+      grid.appendChild(el);
+      const refs = {
+        el, name: el.querySelector('.camera-name'), status: el.querySelector('.camera-status'),
+        occ: el.querySelector('.occ'), ent: el.querySelector('.ent'), peak: el.querySelector('.peak'),
+        fps: el.querySelector('.fps'), lat: el.querySelector('.lat'), off: el.querySelector('.offline-msg'),
+        img: el.querySelector('img'), zoneBadge: el.querySelector('.zone-badge')
+      };
+      cards[cam.camera_id] = refs;
+      return refs;
+    }
+
+    function removeCard(cid) {
+      const c = cards[cid];
+      if (!c) return;
+      c.img.src = '';           // close the MJPEG connection
+      c.el.remove();
+      delete cards[cid];
+      if (Object.keys(cards).length === 0) {
+        $('cameraGrid').innerHTML = '<div class="empty-state">No cameras configured yet. Click <b>Manage Cameras</b> to add one.</div>';
+      }
+    }
+
+    function updateCard(cam) {
+      const c = ensureCard(cam);
+      const online = cam.status === 'ONLINE';
+      c.name.textContent = cam.name || cam.camera_id;
+      c.status.textContent = cam.status;
+      c.status.className = 'camera-status ' + (online ? 'on' : 'off');
+      c.el.classList.toggle('offline', !online);
+      c.off.style.display = online ? 'none' : 'flex';
+      c.occ.textContent = cam.current_occupancy;
+      c.ent.textContent = cam.total_entries;
+      c.peak.textContent = cam.peak_occupancy;
+      c.fps.textContent = cam.processing_fps;
+      c.lat.textContent = `${Math.round(cam.end_to_end_latency_ms)} ms`;
+      const zones = cam.exclude_zone_count || 0;
+      c.zoneBadge.style.display = zones ? 'inline-flex' : 'none';
+      c.zoneBadge.textContent = zones === 1 ? '1 excluded area' : `${zones} excluded areas`;
+      frameSizes[cam.camera_id] = { w: cam.frame_width, h: cam.frame_height };
+    }
+
+    // ------------------------------------------------------------------ polling
+    async function refresh() {
+      try {
+        const res = await fetch('/api/occupancy');
+        if (!res.ok) return;
+        const d = await res.json();
+
+        try {
+          const lightRes = await fetch('/api/lighting');
+          if (lightRes.ok) updateLightingPanel(await lightRes.json());
+        } catch (e) { /* lighting status can recover on the next poll */ }
+
+        $('kpiCurrent').textContent = d.current_occupancy;
+        $('kpiPeak').textContent = d.peak_occupancy;
+
+        // Average occupancy is time-weighted over the day so far, not an average of samples
+        $('kpiAverage').textContent = Math.round(d.average_occupancy ?? 0);
+        $('kpiAverageSub').textContent = d.tracking_since
+          ? `since ${clock(d.tracking_since)}` : 'no activity yet today';
+
+        if (d.peak_time) {
+          $('kpiBusiest').textContent = clock(d.peak_time);
+          $('kpiBusiestSub').textContent = `${d.peak_occupancy} people at once`;
+        } else {
+          $('kpiBusiest').textContent = '--:--';
+          $('kpiBusiestSub').innerHTML = '&nbsp;';
+        }
+        $('kpiCams').textContent = `${d.cameras_online} / ${d.cameras_total}`;
+        const offline = d.cameras.filter(c => c.status !== 'ONLINE').map(c => c.name || c.camera_id);
+        $('kpiCamsSub').innerHTML = offline.length ? esc('Offline: ' + offline.join(', ')) : '&nbsp;';
+
+        const badge = $('systemStatus');
+        const degraded = d.cameras_total > 0 && d.cameras_online < d.cameras_total;
+        badge.classList.toggle('degraded', degraded);
+        $('systemStatusText').textContent = degraded ? `${d.cameras_total - d.cameras_online} camera(s) offline` : 'System Operational';
+
+        const seen = new Set();
+        for (const cam of d.cameras) {
+          // One bad camera must not stop the others from updating
+          try { updateCard(cam); } catch (e) { console.error('card update failed', cam.camera_id, e); }
+          seen.add(cam.camera_id);
+        }
+        for (const cid of Object.keys(cards)) if (!seen.has(cid)) removeCard(cid);
+        lastRefreshOk = Date.now();
+      } catch (e) { /* server restarting; the stale banner will show if this persists */ }
+      updateStaleBanner();
+    }
+
+    function updateLightingPanel(status) {
+      const enabled = $('lightingEnabled');
+      const mode = $('lightingMode');
+      const delay = $('lightingDelay');
+      if (document.activeElement !== enabled) enabled.checked = status.enabled;
+      if (document.activeElement !== mode) mode.value = status.mode;
+      if (document.activeElement !== delay) delay.value = String(status.off_delay_seconds);
+      $('lightingState').textContent = status.light_state;
+      $('lightingDongle').textContent = status.dongle.status;
+      $('lightingTimer').textContent = status.off_timer_remaining_seconds == null
+        ? 'Inactive' : `${status.off_timer_remaining_seconds}s remaining`;
+      const details = [];
+      if (status.inhibit_reason) details.push(status.inhibit_reason);
+      if (status.cameras_total === 0) details.push('No cameras configured');
+      else if (status.cameras_online < status.cameras_total) details.push(`${status.cameras_total - status.cameras_online} camera(s) offline`);
+      if (status.dongle.error) details.push(status.dongle.error);
+      $('lightingMessage').textContent = details.join(' · ');
+    }
+
+    async function saveLightingSettings() {
+      const message = $('lightingMessage');
+      try {
+        const response = await fetch('/api/lighting', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            enabled: $('lightingEnabled').checked,
+            mode: $('lightingMode').value,
+            off_delay_seconds: Number($('lightingDelay').value)
+          })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.detail || 'Could not update lighting settings');
+        updateLightingPanel(result);
+      } catch (error) {
+        message.textContent = error.message;
+      }
+    }
+
+    // If the numbers stop updating, say so rather than silently showing stale values
+    let lastRefreshOk = Date.now();
+    function updateStaleBanner() {
+      const age = (Date.now() - lastRefreshOk) / 1000;
+      const el = $('staleBanner');
+      el.classList.toggle('show', age > 5);
+      if (age > 5) el.textContent = `Dashboard is not receiving updates (last successful update ${Math.round(age)} s ago). The numbers below may be out of date.`;
+    }
+
+    // WebSocket: an ENTRY event on any camera -> refresh immediately instead of waiting for the poll
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    function connectWS() {
+      const socket = new WebSocket(`${wsProtocol}//${window.location.host}/ws`);
+      socket.onmessage = () => refresh();
+      socket.onclose = () => setTimeout(connectWS, 3000);
+    }
+
+    // ------------------------------------------------------------------ enlarged feed
+    function openFeed(cid) {
+      const cfg = cameraConfigs.find(c => c.camera_id === cid);
+      $('feedTitle').textContent = (cfg && cfg.name ? cfg.name + ' ' : '') + `(${cid})`;
+      $('feedImg').src = `/api/video/${encodeURIComponent(cid)}/stream`;
+      $('feedModal').classList.add('open');
+    }
+    function closeFeed() { $('feedImg').src = ''; $('feedModal').classList.remove('open'); }
+
+    // ------------------------------------------------------------------ exclusion-zone editor
+    // Polygons are kept in the camera's own pixel coordinates, so they stay correct whatever size
+    // the snapshot is displayed at. The SVG viewBox is set to the native frame size, which means
+    // screen <-> camera coordinate conversion is just getScreenCTM().
+    let zoneCam = null;          // camera being edited
+    let zonePolys = [];          // saved + edited areas, each an array of [x, y]
+    let zoneDraft = [];          // area currently being drawn
+    let zoneSelected = null;     // index into zonePolys of the area being edited
+    let zoneDirty = false;
+    let zoneDrag = null;         // {kind, zone, index, startPt, origPoly}
+    let zoneLoadOk = false;      // did the existing areas load? never save over what we could not read
+    let zoneLoadedCount = 0;     // how many areas this camera had when the editor opened
+
+    const zoneSvg = () => $('zoneSvg');
+
+    async function openZoneEditor(cid) {
+      zoneCam = cid;
+      zoneDraft = []; zonePolys = []; zoneSelected = null; zoneDirty = false; zoneDrag = null;
+      const cfg = cameraConfigs.find(c => c.camera_id === cid);
+      $('zoneTitle').textContent = `Excluded areas - ${(cfg && cfg.name) || cid}`;
+      setZoneMsg('');
+      $('zoneModal').classList.add('open');
+      refreshZoneSnapshot();
+      zoneLoadOk = false; zoneLoadedCount = 0;
+      try {
+        const res = await fetch(`/api/cameras/${encodeURIComponent(cid)}/exclude-zones`);
+        if (res.ok) {
+          zonePolys = (await res.json()).zones || [];
+          zoneLoadOk = true;
+          zoneLoadedCount = zonePolys.length;
+        } else {
+          setZoneMsg(`Could not load this camera's existing areas (${res.status}). Saving is disabled so nothing is overwritten.`, true);
+        }
+      } catch (e) {
+        setZoneMsg("Could not load this camera's existing areas. Saving is disabled so nothing is overwritten.", true);
+      }
+      drawZones();
+    }
+
+    function closeZoneEditor() {
+      if (zoneDirty && !confirm('You have unsaved changes to the excluded areas. Close anyway?')) return;
+      $('zoneImg').src = '';
+      $('zoneModal').classList.remove('open');
+      zoneCam = null; zonePolys = []; zoneDraft = []; zoneSelected = null; zoneDirty = false;
+    }
+
+    function refreshZoneSnapshot() {
+      if (!zoneCam) return;
+      $('zoneImg').src = `/api/video/${encodeURIComponent(zoneCam)}/snapshot?t=${Date.now()}`;
+    }
+
+    function setZoneMsg(text, err) {
+      const m = $('zoneMsg'); m.textContent = text; m.className = 'form-msg' + (err ? ' err' : '');
+    }
+
+    function markDirty() { zoneDirty = true; $('zoneDirty').style.display = 'inline'; }
+
+    function nativeSize() {
+      const img = $('zoneImg');
+      const s = frameSizes[zoneCam];
+      if (s && s.w && s.h) return s;                       // real stream size
+      return { w: img.naturalWidth || 1, h: img.naturalHeight || 1 };
+    }
+
+    /** Screen pixels -> camera pixels, via the SVG's own transform (handles any display size). */
+    function toCameraPoint(evt) {
+      const svg = zoneSvg();
+      const pt = svg.createSVGPoint();
+      pt.x = evt.clientX; pt.y = evt.clientY;
+      const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+      const { w, h } = nativeSize();
+      return [
+        Math.max(0, Math.min(w, Math.round(p.x))),
+        Math.max(0, Math.min(h, Math.round(p.y)))
+      ];
+    }
+
+    function pointInPoly(pt, poly) {
+      let inside = false;
+      for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        const [xi, yi] = poly[i], [xj, yj] = poly[j];
+        if ((yi > pt[1]) !== (yj > pt[1]) &&
+            pt[0] < ((xj - xi) * (pt[1] - yi)) / ((yj - yi) || 1e-9) + xi) inside = !inside;
+      }
+      return inside;
+    }
+
+    // ---------------------------------------------------------------- drawing new areas
+    function startNewZone() {
+      zoneSelected = null;
+      zoneDraft = [];
+      $('zoneDrawBtn').style.display = 'none';
+      $('zoneFinishBtn').style.display = '';
+      setZoneMsg('Click the corners of the area on the picture.');
+      drawZones();
+    }
+
+    function finishZone() {
+      if (zoneDraft.length < 3) return setZoneMsg('An area needs at least 3 corners.', true);
+      zonePolys.push(zoneDraft);
+      zoneSelected = zonePolys.length - 1;
+      zoneDraft = [];
+      $('zoneDrawBtn').style.display = '';
+      $('zoneFinishBtn').style.display = 'none';
+      markDirty();
+      setZoneMsg('Area added - drag its corners to adjust, then Save.');
+      drawZones();
+    }
+
+    function undoZonePoint() {
+      if (zoneDraft.length) zoneDraft.pop();
+      else if (zoneSelected !== null) { selectZone(null); return; }
+      else if (zonePolys.length) { zonePolys.pop(); markDirty(); }
+      drawZones();
+    }
+
+    function selectZone(i) {
+      zoneSelected = i;
+      $('zoneDelBtn').style.display = i === null ? 'none' : '';
+      drawZones();
+    }
+
+    function deleteSelectedZone() {
+      if (zoneSelected === null) return;
+      zonePolys.splice(zoneSelected, 1);
+      selectZone(null);
+      markDirty();
+      setZoneMsg('Area removed. Press Save to apply.');
+    }
+
+    function clearZones() {
+      if (!zonePolys.length && !zoneDraft.length) return;
+      zonePolys = []; zoneDraft = []; selectZone(null);
+      markDirty();
+      setZoneMsg('All areas cleared. Press Save to apply.');
+      drawZones();
+    }
+
+    // ---------------------------------------------------------------- pointer handling
+    zoneSvg().addEventListener('pointerdown', (e) => {
+      if (e.button === 2) return;                      // right-click handled by contextmenu
+      const pt = toCameraPoint(e);
+
+      if (zoneDraft.length || $('zoneFinishBtn').style.display === '') {
+        zoneDraft.push(pt);                            // drawing mode: every click adds a corner
+        drawZones();
+        return;
+      }
+
+      const handle = e.target.dataset || {};
+      if (handle.kind === 'vertex') {
+        zoneDrag = { kind: 'vertex', zone: +handle.zone, index: +handle.index };
+        selectZone(+handle.zone);
+      } else if (handle.kind === 'midpoint') {
+        // Dragging an edge dot inserts a new corner there and then moves it
+        const z = +handle.zone, i = +handle.index;
+        zonePolys[z].splice(i + 1, 0, pt);
+        zoneDrag = { kind: 'vertex', zone: z, index: i + 1 };
+        selectZone(z);
+        markDirty();
+      } else {
+        // Clicking inside an area selects it; dragging then moves the whole area
+        const hit = zonePolys.findIndex(poly => pointInPoly(pt, poly));
+        if (hit >= 0) {
+          selectZone(hit);
+          zoneDrag = { kind: 'body', zone: hit, startPt: pt, origPoly: zonePolys[hit].map(p => p.slice()) };
+        } else {
+          selectZone(null);
+          return;
+        }
+      }
+      zoneSvg().setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+
+    zoneSvg().addEventListener('pointermove', (e) => {
+      if (!zoneDrag) return;
+      zoneDrag.moved = true;
+      const pt = toCameraPoint(e);
+      if (zoneDrag.kind === 'vertex') {
+        zonePolys[zoneDrag.zone][zoneDrag.index] = pt;
+      } else if (zoneDrag.kind === 'body') {
+        const dx = pt[0] - zoneDrag.startPt[0], dy = pt[1] - zoneDrag.startPt[1];
+        const { w, h } = nativeSize();
+        zonePolys[zoneDrag.zone] = zoneDrag.origPoly.map(([x, y]) => [
+          Math.max(0, Math.min(w, x + dx)), Math.max(0, Math.min(h, y + dy))
+        ]);
+      }
+      markDirty();
+      drawZones();
+    });
+
+    const endZoneDrag = () => {
+      if (!zoneDrag) return;
+      // Selecting an area is a click, not an edit - only say "edited" if something actually moved
+      if (zoneDrag.moved) setZoneMsg('Edited - press Save to apply.');
+      zoneDrag = null;
+    };
+    zoneSvg().addEventListener('pointerup', endZoneDrag);
+    zoneSvg().addEventListener('pointercancel', endZoneDrag);
+
+    zoneSvg().addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      const d = e.target.dataset || {};
+      if (d.kind !== 'vertex') return;
+      const poly = zonePolys[+d.zone];
+      if (poly.length <= 3) return setZoneMsg('An area needs at least 3 corners.', true);
+      poly.splice(+d.index, 1);
+      markDirty();
+      setZoneMsg('Corner removed - press Save to apply.');
+      drawZones();
+    });
+
+    // ---------------------------------------------------------------- rendering
+    function drawZones() {
+      const { w, h } = nativeSize();
+      const svg = zoneSvg();
+      svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+      const drawing = zoneDraft.length > 0 || $('zoneFinishBtn').style.display === '';
+      svg.classList.toggle('drawing', drawing);
+
+      const r = Math.max(4, Math.round(w / 180));       // handle radius in camera pixels
+      const sw = Math.max(2, Math.round(w / 500));      // stroke width
+      const parts = [];
+
+      zonePolys.forEach((poly, z) => {
+        const sel = z === zoneSelected;
+        const pts = poly.map(p => p.join(',')).join(' ');
+        parts.push(`<polygon points="${pts}" fill="rgba(239,68,68,${sel ? 0.34 : 0.24})" ` +
+                   `stroke="${sel ? '#f59e0b' : '#ef4444'}" stroke-width="${sel ? sw * 1.6 : sw}" ` +
+                   `style="cursor:${drawing ? 'crosshair' : 'move'}"/>`);
+        if (sel && !drawing) {
+          // edge midpoints: drag one to add a corner
+          poly.forEach((p, i) => {
+            const q = poly[(i + 1) % poly.length];
+            parts.push(`<circle cx="${(p[0] + q[0]) / 2}" cy="${(p[1] + q[1]) / 2}" r="${r * 0.62}" ` +
+                       `fill="rgba(15,23,42,0.6)" stroke="#f59e0b" stroke-width="${sw}" ` +
+                       `data-kind="midpoint" data-zone="${z}" data-index="${i}" style="cursor:copy"/>`);
+          });
+          // corner handles
+          poly.forEach((p, i) => {
+            parts.push(`<circle cx="${p[0]}" cy="${p[1]}" r="${r}" fill="#f59e0b" stroke="#0f172a" ` +
+                       `stroke-width="${sw}" data-kind="vertex" data-zone="${z}" data-index="${i}" ` +
+                       `style="cursor:grab"><title>Drag to move, right-click to remove</title></circle>`);
+          });
+        }
+        const [lx, ly] = poly[0];
+        parts.push(`<text x="${lx}" y="${Math.max(r * 3, ly - r * 1.5)}" fill="${sel ? '#f59e0b' : '#ef4444'}" ` +
+                   `font-size="${r * 2.6}" font-weight="700" style="pointer-events:none">${z + 1}</text>`);
+      });
+
+      if (zoneDraft.length) {
+        const pts = zoneDraft.map(p => p.join(',')).join(' ');
+        parts.push(zoneDraft.length > 2
+          ? `<polygon points="${pts}" fill="rgba(59,130,246,0.25)" stroke="#3b82f6" stroke-width="${sw}" style="pointer-events:none"/>`
+          : `<polyline points="${pts}" fill="none" stroke="#3b82f6" stroke-width="${sw}" style="pointer-events:none"/>`);
+        zoneDraft.forEach(pt => parts.push(
+          `<circle cx="${pt[0]}" cy="${pt[1]}" r="${r * 0.8}" fill="#3b82f6" style="pointer-events:none"/>`));
+      }
+      svg.innerHTML = parts.join('');
+
+      $('zoneList').innerHTML = zonePolys.length
+        ? zonePolys.map((poly, i) =>
+            `<span class="zone-chip ${i === zoneSelected ? 'selected' : ''}" onclick="selectZone(${i})">` +
+            `Area ${i + 1} (${poly.length} corners)` +
+            `<button title="Remove" onclick="event.stopPropagation(); removeZone(${i})">&times;</button></span>`).join('')
+        : '<span class="hint">No excluded areas on this camera - everything in view is counted.</span>';
+      $('zoneFinishBtn').textContent = zoneDraft.length ? `Finish area (${zoneDraft.length} corners)` : 'Finish area';
+      $('zoneDelBtn').style.display = (zoneSelected === null || drawing) ? 'none' : '';
+    }
+
+    function removeZone(i) {
+      zonePolys.splice(i, 1);
+      if (zoneSelected === i) zoneSelected = null;
+      else if (zoneSelected > i) zoneSelected--;
+      markDirty();
+      setZoneMsg('Area removed. Press Save to apply.');
+      drawZones();
+    }
+
+    async function saveZones() {
+      if (!zoneCam) return;
+      if (!zoneLoadOk) {
+        return setZoneMsg("This camera's existing areas could not be loaded, so saving is blocked. Close and reopen the editor.", true);
+      }
+      if (zoneDraft.length >= 3) finishZone();
+      else if (zoneDraft.length) return setZoneMsg('Finish or undo the area you are drawing first.', true);
+      // Removing every area is legitimate, but never silently
+      if (zonePolys.length === 0 && zoneLoadedCount > 0 &&
+          !confirm(`Remove all ${zoneLoadedCount} excluded area(s) from this camera? Everything in view will be counted again.`)) {
+        return;
+      }
+      try {
+        const res = await fetch(`/api/cameras/${encodeURIComponent(zoneCam)}/exclude-zones`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ zones: zonePolys })
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) return setZoneMsg(body.detail || `Save failed (${res.status})`, true);
+        zonePolys = body.zones || zonePolys;
+        zoneLoadedCount = zonePolys.length;
+        zoneDirty = false; $('zoneDirty').style.display = 'none';
+        setZoneMsg(`${body.message} - the detector applies this within a few seconds.`);
+        await loadCameraConfigs();
+        drawZones();
+      } catch (e) { setZoneMsg('Could not reach the server.', true); }
+    }
+
+    // ------------------------------------------------------------------ camera manager
+    async function loadCameraConfigs() {
+      try {
+        const res = await fetch('/api/cameras');
+        cameraConfigs = res.ok ? await res.json() : [];
+      } catch (e) { cameraConfigs = []; }
+      const body = $('camTableBody');
+      body.innerHTML = cameraConfigs.length ? '' : '<tr><td colspan="6" style="color:var(--text-muted)">No cameras configured.</td></tr>';
+      for (const c of cameraConfigs) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${esc(c.camera_id)}</td><td>${esc(c.name || '')}</td>
+          <td class="url" title="${esc(c.stream_url)}">${esc(c.stream_url)}</td>
+          <td>${esc(c.confidence_threshold ?? '')}</td>
+          <td>${c.enabled === false ? 'No' : 'Yes'}</td>
+          <td style="white-space:nowrap">
+            <button class="btn small" onclick='editCamera(${JSON.stringify(c.camera_id)})'>Edit</button>
+            <button class="btn small danger" onclick='deleteCamera(${JSON.stringify(c.camera_id)})'>Delete</button>
+          </td>`;
+        body.appendChild(tr);
+      }
+    }
+
+    function openManager() { loadCameraConfigs(); resetForm(); $('managerModal').classList.add('open'); }
+    function closeManager() { $('managerModal').classList.remove('open'); }
+
+    function resetForm() {
+      editingId = null;
+      $('formTitle').textContent = 'Add camera';
+      $('saveBtn').textContent = 'Add camera';
+      $('fId').value = ''; $('fId').disabled = false;
+      $('fName').value = ''; $('fUrl').value = ''; $('fConf').value = '0.35'; $('fEnabled').checked = true;
+      setMsg('');
+    }
+
+    function editCamera(cid) {
+      const c = cameraConfigs.find(x => x.camera_id === cid);
+      if (!c) return;
+      editingId = cid;
+      $('formTitle').textContent = `Edit ${cid}`;
+      $('saveBtn').textContent = 'Save changes';
+      $('fId').value = c.camera_id; $('fId').disabled = true;
+      $('fName').value = c.name || '';
+      $('fUrl').value = c.stream_url || '';
+      $('fConf').value = c.confidence_threshold ?? 0.35;
+      $('fEnabled').checked = c.enabled !== false;
+      setMsg('');
+    }
+
+    function setMsg(text, err) { const m = $('formMsg'); m.textContent = text; m.className = 'form-msg' + (err ? ' err' : ''); }
+
+    async function saveCamera() {
+      const id = $('fId').value.trim();
+      const url = $('fUrl').value.trim();
+      if (!id || /\s/.test(id)) return setMsg('Camera ID is required and must not contain spaces.', true);
+      if (!url) return setMsg('Stream URL is required.', true);
+      const payload = {
+        camera_id: id, name: $('fName').value.trim() || id, stream_url: url,
+        enabled: $('fEnabled').checked, confidence_threshold: parseFloat($('fConf').value) || 0.35
+      };
+      try {
+        const res = editingId
+          ? await fetch(`/api/cameras/${encodeURIComponent(editingId)}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) })
+          : await fetch('/api/cameras', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) return setMsg(body.detail || `Request failed (${res.status})`, true);
+        setMsg(editingId ? 'Saved. The camera will reconnect within a few seconds.' : 'Camera added. It will appear on the dashboard within a few seconds.');
+        await loadCameraConfigs();
+        if (!editingId) resetForm();
+      } catch (e) { setMsg('Could not reach the server.', true); }
+    }
+
+    async function deleteCamera(cid) {
+      if (!confirm(`Delete camera ${cid}? Its live counting will stop.`)) return;
+      try {
+        const res = await fetch(`/api/cameras/${encodeURIComponent(cid)}`, { method: 'DELETE' });
+        if (!res.ok) { const b = await res.json().catch(() => ({})); return setMsg(b.detail || 'Delete failed', true); }
+        await loadCameraConfigs();
+        if (editingId === cid) resetForm();
+      } catch (e) { setMsg('Could not reach the server.', true); }
+    }
+
+    // ------------------------------------------------------------------ boot
+    loadCameraConfigs();
+    refresh();
+    // Frames are produced a few times a second; polling twice a second keeps the counts on the
+    // cards close to what the live picture is showing.
+    setInterval(refresh, 500);
+    setInterval(updateStaleBanner, 1000);
+    connectWS();
+  </script>
+</body>
+</html>

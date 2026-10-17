@@ -1,0 +1,67 @@
+[
+  {
+    "camera_id": "CAM-001",
+    "name": "Main Entrance",
+    "stream_url": "rtsp://user:pass@CAMERA_IP",
+    "enabled": true,
+    "zone": "workspace",
+    "counting_line": {
+      "x1": 200,
+      "y1": 500,
+      "x2": 1100,
+      "y2": 100,
+      "entry_direction": "top_to_bottom",
+      "exit_direction": "bottom_to_top"
+    },
+    "zone_polygon": [
+      [
+        209,
+        511
+      ],
+      [
+        1125,
+        96
+      ],
+      [
+        1530,
+        163
+      ],
+      [
+        1503,
+        757
+      ],
+      [
+        208,
+        514
+      ]
+    ],
+    "confidence_threshold": 0.35
+  },
+  {
+    "camera_id": "CAM-002",
+    "name": "Workspace",
+    "stream_url": "rtsp://user:pass@CAMERA_IP",
+    "enabled": true,
+    "confidence_threshold": 0.35,
+    "exclude_zones": [
+      [
+        [
+          1426,
+          96
+        ],
+        [
+          1620,
+          236
+        ],
+        [
+          1410,
+          500
+        ],
+        [
+          1226,
+          438
+        ]
+      ]
+    ]
+  }
+]
