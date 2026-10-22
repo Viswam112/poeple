@@ -127,7 +127,6 @@ class TrackEventModel(Base):
     camera_id = Column(String(50), index=True, nullable=False)
     track_id = Column(Integer, nullable=False)
     event_type = Column(String(20), nullable=False)  # ENTRY or EXIT
-    zone = Column(String(50), default="workspace")
     timestamp = Column(Float, index=True, nullable=False)
     confidence = Column(Float, default=0.0)
 
@@ -505,7 +504,6 @@ class Track:
         self.status = "tentative"     # tentative -> confirmed -> lost
         self.lost_reason = ""
         self.confirmed_at: Optional[float] = None
-        self.zone = "unknown"
 
         self.trajectory = deque(maxlen=max_history)
         self._update_reference_points(initial_bbox)
@@ -910,7 +908,6 @@ class CountingEngine:
                             f"reason {trk.lost_reason}, lived {now - (trk.confirmed_at or now):.0f}s)")
 
         for trk in tracks:
-            trk.zone = "workspace"
             if trk.track_id not in self.known_track_ids:
                 self.known_track_ids.add(trk.track_id)
                 self.total_entries += 1

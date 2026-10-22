@@ -8,5 +8,6 @@ __pycache__/
 /people_counter.db
 /people_counter.db-*
 .env
+/config/dongle_api.json
 .venv/
 venv/
