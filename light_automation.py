@@ -47,6 +47,21 @@ class LightAutomation:
                 self._off_delay_seconds = self._validate_delay(off_delay_seconds)
             return self._snapshot(time.monotonic())
 
+    def set_manual_state(self, state):
+        state = str(state).upper()
+        if state not in {"ON", "OFF"}:
+            raise ValueError("state must be ON or OFF")
+        with self._lock:
+            if not self.dongle.set_state(state):
+                return False
+            self._light_state = state
+            self._mode = "FORCE_ON" if state == "ON" else "FORCE_OFF"
+            self._last_attempted_state = None
+            self._last_attempt_at = None
+            self._zero_since = None
+            self._inhibit_reason = None
+            return True
+
     def update(self, occupancy, cameras_ready, now=None):
         now = time.monotonic() if now is None else now
         occupancy = max(0, int(occupancy))
@@ -68,15 +83,17 @@ class LightAutomation:
                 self._zero_since = None
                 self._inhibit_reason = "Automatic lighting is disabled"
                 return self._snapshot(now)
+            if occupancy > 0:
+                self._inhibit_reason = None
+                self._request_state("ON", now)
+                return self._snapshot(now)
             if not cameras_ready:
                 self._zero_since = None
                 self._inhibit_reason = "Waiting for all cameras to be online"
                 return self._snapshot(now)
 
             self._inhibit_reason = None
-            if occupancy > 0:
-                self._request_state("ON", now)
-            elif self._has_seen_presence:
+            if self._has_seen_presence:
                 if self._zero_since is None:
                     self._zero_since = now
                 if now - self._zero_since >= self._off_delay_seconds:

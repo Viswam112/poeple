@@ -9,7 +9,6 @@ from abc import ABC, abstractmethod
 from collections import deque
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Sequence, Tuple
-
 import cv2
 import numpy as np
 import torch
@@ -79,9 +78,10 @@ class Settings:
 
     # Config file path for persistent camera setup
     CAMERAS_CONFIG_PATH: str = os.getenv("CAMERAS_CONFIG_PATH", "config/cameras.json")
+    DONGLE_API_CONFIG_PATH: str = os.getenv("DONGLE_API_CONFIG_PATH", "config/dongle_api.json")
 
-    # Lighting stays disabled until local bridge commands are configured and enabled by an operator.
-    LIGHT_AUTO_ENABLED: bool = os.getenv("LIGHT_AUTO_ENABLED", "false").lower() in {"1", "true", "yes"}
+    # Automatic lighting can be explicitly disabled with LIGHT_AUTO_ENABLED=false.
+    LIGHT_AUTO_ENABLED: bool = os.getenv("LIGHT_AUTO_ENABLED", "true").lower() in {"1", "true", "yes"}
     LIGHT_AUTO_OFF_DELAY_SECONDS: int = int(os.getenv("LIGHT_AUTO_OFF_DELAY_SECONDS", "300"))
     LIGHT_COMMAND_RETRY_COUNT: int = int(os.getenv("LIGHT_COMMAND_RETRY_COUNT", "3"))
     LIGHT_COMMAND_RETRY_DELAY: float = float(os.getenv("LIGHT_COMMAND_RETRY_DELAY", "1"))
@@ -93,12 +93,29 @@ class Settings:
 settings = Settings()
 os.makedirs("config", exist_ok=True)
 
+
+def load_dongle_api_config() -> Dict[str, Any]:
+    try:
+        with open(settings.DONGLE_API_CONFIG_PATH, "r", encoding="utf-8") as config_file:
+            config = json.load(config_file)
+    except FileNotFoundError:
+        return {}
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.error(f"Could not read {settings.DONGLE_API_CONFIG_PATH}: {exc}")
+        return {}
+    if not isinstance(config, dict):
+        logger.error(f"{settings.DONGLE_API_CONFIG_PATH} must contain a JSON object")
+        return {}
+    return config
+
+
 dongle_controller = DongleController(
     on_command=settings.LIGHT_ON_COMMAND,
     off_command=settings.LIGHT_OFF_COMMAND,
     retry_count=settings.LIGHT_COMMAND_RETRY_COUNT,
     retry_delay=settings.LIGHT_COMMAND_RETRY_DELAY,
     timeout=settings.LIGHT_COMMAND_TIMEOUT_SECONDS,
+    api_config=load_dongle_api_config(),
 )
 light_automation = LightAutomation(
     dongle=dongle_controller,
@@ -1699,6 +1716,22 @@ def configure_lighting(payload: Dict[str, Any] = Body(...)):
         light_automation.configure(**payload)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+    return get_lighting_status()
+
+
+@lighting_router.post("/command")
+def command_lighting(payload: Dict[str, Any] = Body(...)):
+    if set(payload) != {"state"} or not isinstance(payload.get("state"), str):
+        raise HTTPException(status_code=400, detail="Provide only a string state: ON or OFF")
+    state = payload["state"].upper()
+    if state not in {"ON", "OFF"}:
+        raise HTTPException(status_code=400, detail="state must be ON or OFF")
+    if not light_automation.set_manual_state(state):
+        status = dongle_controller.get_status()
+        raise HTTPException(
+            status_code=503,
+            detail=status["error"] or f"Could not turn lights {state.lower()}",
+        )
     return get_lighting_status()
 
 

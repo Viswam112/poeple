@@ -1,5 +1,17 @@
 {
   "api_url": "",
   "api_key": "",
-  "auth_token": ""
+  "auth_token": "",
+  "auth_scheme": "Bearer",
+  "api_key_header": "X-API-Key",
+  "control_path": "/iot/catalog/devices/{catalog_device_id}/commands/{command_key}",
+  "device_id": "",
+  "device_name": "",
+  "thing_id": "",
+  "catalog_device_id": "",
+  "command_key": "",
+  "message_id": "",
+  "channel": "1",
+  "switch_no": "S1",
+  "sub_topic": "control"
 }

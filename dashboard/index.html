@@ -43,6 +43,7 @@
       padding: 7px 14px; border-radius: 8px; font-size: 0.85rem; font-weight: 500; cursor: pointer;
     }
     .btn:hover { border-color: var(--accent-blue); }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
     .btn.primary { background: var(--accent-blue); border-color: var(--accent-blue); }
     .btn.danger { color: var(--accent-red); }
     .btn.small { padding: 4px 10px; font-size: 0.78rem; }
@@ -57,6 +58,7 @@
     .lighting-control select { min-width: 132px; background: var(--card-bg-solid); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 6px; padding: 7px 9px; font-size: 0.85rem; text-transform: none; }
     .lighting-toggle { display: inline-flex; align-items: center; gap: 8px; min-height: 34px; color: var(--text-main); font-size: 0.85rem; }
     .lighting-toggle input { width: 18px; height: 18px; accent-color: var(--accent-green); }
+    .lighting-manual { display: inline-flex; gap: 8px; }
     .lighting-detail { min-width: 120px; display: grid; gap: 4px; font-size: 0.8rem; }
     .lighting-detail .label { color: var(--text-muted); font-size: 0.68rem; text-transform: uppercase; }
     .lighting-message { flex: 1 1 100%; min-height: 1em; color: var(--text-muted); font-size: 0.78rem; }
@@ -214,7 +216,11 @@
   <section class="lighting-panel" aria-label="Smart lighting controls">
     <div class="lighting-head">
       <h2>Smart Lighting</h2>
-      <div class="lighting-state">Light state: <b id="lightingState">UNKNOWN</b></div>
+      <div class="lighting-state">
+        Hive reported state: <b id="lightingReportedState">UNKNOWN</b>
+        <span id="lightingReportedAt">Waiting for Hive status</span>
+        · Last command: <b id="lightingState">UNKNOWN</b>
+      </div>
     </div>
     <div class="lighting-controls">
       <label class="lighting-toggle"><input id="lightingEnabled" type="checkbox" onchange="saveLightingSettings()"> Automatic lighting</label>
@@ -235,6 +241,11 @@
           <option value="1800">30 minutes</option>
         </select>
       </label>
+      <div class="lighting-manual" aria-label="Manual light test">
+        <button class="btn primary" id="lightingOn" type="button" onclick="sendManualLightCommand('ON')">Turn on</button>
+        <button class="btn danger" id="lightingOff" type="button" onclick="sendManualLightCommand('OFF')">Turn off</button>
+      </div>
+      <div class="lighting-detail"><span class="label">Manual test</span><b>Auto may override</b></div>
       <div class="lighting-detail"><span class="label">Dongle bridge</span><b id="lightingDongle">NOT_CONFIGURED</b></div>
       <div class="lighting-detail"><span class="label">OFF timer</span><b id="lightingTimer">Inactive</b></div>
       <div class="lighting-message" id="lightingMessage" role="status"></div>
@@ -469,14 +480,38 @@
       if (document.activeElement !== mode) mode.value = status.mode;
       if (document.activeElement !== delay) delay.value = String(status.off_delay_seconds);
       $('lightingState').textContent = status.light_state;
+      const reportedState = status.dongle.reported_state || 'UNKNOWN';
+      $('lightingReportedState').textContent = reportedState;
+      const reportedAt = status.dongle.reported_at
+        ? new Date(status.dongle.reported_at).toLocaleString()
+        : null;
+      const reportedAtLabel = status.dongle.reported_at_source === 'device_report'
+        ? 'Last device report'
+        : status.dongle.reported_at_source === 'record_updated'
+          ? 'Hive record updated'
+          : null;
+      $('lightingReportedAt').textContent = reportedAtLabel && reportedAt
+        ? `${reportedAtLabel}: ${reportedAt}${status.dongle.reported_at_source === 'record_updated' ? ' (not live confirmation)' : ''}`
+        : status.dongle.reported_error || 'No state reported by Hive';
       $('lightingDongle').textContent = status.dongle.status;
+      $('lightingDongle').dataset.error = status.dongle.error || '';
+      const commandUnavailable = status.dongle.status === 'NOT_CONFIGURED'
+        || status.dongle.error === 'API authentication is not configured';
+      $('lightingOn').disabled = commandUnavailable;
+      $('lightingOff').disabled = commandUnavailable;
+      $('lightingOn').title = commandUnavailable ? 'Configure API authentication or local bridge commands first' : '';
+      $('lightingOff').title = commandUnavailable ? 'Configure API authentication or local bridge commands first' : '';
       $('lightingTimer').textContent = status.off_timer_remaining_seconds == null
         ? 'Inactive' : `${status.off_timer_remaining_seconds}s remaining`;
       const details = [];
       if (status.inhibit_reason) details.push(status.inhibit_reason);
       if (status.cameras_total === 0) details.push('No cameras configured');
       else if (status.cameras_online < status.cameras_total) details.push(`${status.cameras_total - status.cameras_online} camera(s) offline`);
+      if (status.dongle.status === 'NOT_CONFIGURED') {
+        details.push('Configure authenticated API credentials or local bridge commands to test the lights');
+      }
       if (status.dongle.error) details.push(status.dongle.error);
+      if (status.dongle.reported_error) details.push(status.dongle.reported_error);
       $('lightingMessage').textContent = details.join(' · ');
     }
 
@@ -497,6 +532,31 @@
         updateLightingPanel(result);
       } catch (error) {
         message.textContent = error.message;
+      }
+    }
+
+    async function sendManualLightCommand(state) {
+      const message = $('lightingMessage');
+      const buttons = [$('lightingOn'), $('lightingOff')];
+      buttons.forEach(button => button.disabled = true);
+      message.textContent = `Sending ${state.toLowerCase()} command...`;
+      try {
+        const response = await fetch('/api/lighting/command', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.detail || `Command failed (${response.status})`);
+        updateLightingPanel(result);
+        message.textContent = `${state} command accepted by Hive. Verify device telemetry to confirm the light changed.`;
+      } catch (error) {
+        message.textContent = error.message;
+      } finally {
+        buttons.forEach(button => button.disabled = false);
+        const unavailable = $('lightingDongle').textContent === 'NOT_CONFIGURED'
+          || $('lightingDongle').dataset.error === 'API authentication is not configured';
+        buttons.forEach(button => button.disabled = unavailable);
       }
     }
 
